@@ -67,7 +67,7 @@ def message():
     probot_id = None
     body = json.loads(request.get_data())
     print("args:", body["args"], "kwargs:", body["kwargs"])
-    print(body["args"][0])   
+    print(body["args"][0])  
     probot_id = int(body["args"][0])
     probot = Probot.query.filter_by(id = probot_id).first()			
     probot.is_available = True

@@ -16,39 +16,17 @@ else{
 var define,module,exports;
 'use strict';
 
+var this_js_script = $('script[src*=nipplejs]');
 
-var socket = null;
-var isopen = false;
+var probot_id = this_js_script.attr('probot_id');
+
 var direction1=0;
-var joystickID=0;
 var up = 0;
 var down = 0;
 var left = 0;
 var right = 0;
-var incomingMsg=0;
-var res=0;
-
-socket = new WebSocket("ws://127.0.0.1:9000");
-
-socket.onopen = function() {
-	console.log("Connected!");
-  	isopen = true;
-	}
-
-        socket.onmessage = function (evt) 
-           { 
-           var received_msg = evt.data;
-	   var res = received_msg.split(" ");
-	   if (res[0]=="ProBot2_info"){
-		res1= "Bat. : " + res[1] + " V"; 
-		}
-	    
-	   console.log(res);
-	   document.getElementById("logId").value=res1;
-	   
-            };
-
-
+var keys = [];
+var keysMsg = [0,0,0,0];
 
 // Constants
 var isTouch = !!('ontouchstart' in window);
@@ -739,6 +717,119 @@ Collection.constructor = Collection;
 Collection.id = 0;
 
 function Collection (manager, options) {
+
+	// the URL of the WAMP Router (Crossbar.io)
+
+	//var wsuri;
+
+	//if (document.location.origin == "file://")
+	//{
+		//wsuri = "ws://127.0.0.1:8080/ws";
+	//}
+	//else
+	//{
+		//wsuri = (document.location.protocol === "http:" ? "ws:" : "wss:") + "//" + document.location.host + "/ws";
+	//}
+
+	// the WAMP connection to the Router
+
+	var connection = new autobahn.Connection({
+		url: "ws://127.0.0.1:8080/ws",
+		realm: "realm1"
+	});
+
+	// timers
+
+	var t1, t2;
+	
+	// fired when connection is established and session attached
+
+	connection.onopen = function (session, details){
+	
+		console.log("Connected");
+	
+		session.publish("general-topic", [probot_id]);
+		console.log("Published Probot_id to general-topic, id: " + probot_id);
+	
+		var probot_topic = "probot-topic-" + probot_id;
+		var keepalive_topic = "keepalive-" + probot_id;
+	
+	
+		window.setInterval(function (){
+				session.publish(keepalive_topic, []);
+				console.log("keepalive");
+			}, 5000); // MILISEGUNDOS
+		
+		var probot_topic = "probot-topic-" + probot_id;
+		// SUBSCRIBE to a topic and receive events
+
+		function receiveBattery(args)
+		{
+			var dataReceived = args[0];
+			console.log("battery voltage: " + dataReceived.toFixed(3));
+			document.getElementById("battery").value=dataReceived.toFixed(3);
+		}
+	
+		session.subscribe(probot_topic, receiveBattery).then(
+			function (sub)
+			{
+				console.log('subscribed to topic');
+			},
+			function (err)
+			{
+				console.log('failed to subscribe to topic', err);
+			}
+		);
+
+
+	// PUBLISH an event every second
+
+		t1 = setInterval(function (){
+	
+			keysMsg = [up.toFixed(3), down.toFixed(3) , left.toFixed(3), right.toFixed(3)];
+			session.publish(probot_topic, [keysMsg]);
+			//session.publish("general-topic", [probot_id]);
+			//session.publish('probot2beagle', [keysMsg], {probot_id: probot_id});
+			//console.log("published to topic 'probot2beagle'");
+		}, 100);
+	
+		chooseControl = function (control_id)
+		{
+			if(control_id == "keyboard")
+			{
+				keyboardHandler(session, probot_topic);
+			}
+			else if(control_id == "joystick")
+			{
+				joystickHandler(session, probot_topic);
+			}
+		}
+	
+	};
+	
+	// fired when connection was lost (or could not be established)s
+	//
+	connection.onclose = function (reason, details){
+
+		console.log("Connection lost: " + reason);
+
+		if (t1)
+		{
+			clearInterval(t1);
+			t1 = null;
+		}
+		if (t2)
+		{
+			clearInterval(t2);
+			t2 = null;
+		}
+	}
+
+	// now actually open the connection
+
+	connection.open();
+
+//------------------------------------
     var self = this;
     self.nipples = [];
     self.idles = [];
@@ -1121,34 +1212,39 @@ Collection.prototype.processOnMove = function (evt) {
     self.trigger('move ' + identifier + ':move', toSend);
     
 
-    if (self.id==0){
-    if (direction1=='up'){
+    if (self.id==0)
+    {
+    	if (direction1=='up')
+    	{
+        	up=toSend.distance/100;
+			down=0;
+    	}
 
-        up=toSend.distance/100;
-	down=0;
-    }
-
-    if (direction1=='down'){
-	up=0;
-        down=toSend.distance/100;
+    	if (direction1=='down')
+    	{
+			up=0;
+        	down=toSend.distance/100;
         }
     }
 
-    if (self.id==1){
-    if (direction1=='left'){
-        left=toSend.distance/100;
-	right=0;
-    }
+    if (self.id==1)
+    {
+    	if (direction1=='left')
+    	{
+        	left=toSend.distance/100;
+			right=0;
+    	}
 
-    if (direction1=='right'){
-	left=0;
-        right=toSend.distance/100;  
+    	if (direction1=='right')
+    	{
+			left=0;
+        	right=toSend.distance/100;  
     	}
     }
 
-    if (isopen) {
-	socket.send("web" + " " + up.toFixed(3) + " " + down.toFixed(3) + " " + left.toFixed(3) + " " + right.toFixed(3));
-    	}
+	// keysMsg = [up.toFixed(3), down.toFixed(3) , left.toFixed(3), right.toFixed(3)];
+	//session.publish('probot2beagle', [keysMsg]);
+	
 };
 
 Collection.prototype.processOnEnd = function (evt) {
@@ -1175,20 +1271,20 @@ Collection.prototype.processOnEnd = function (evt) {
     }
 
 
-
-    if (self.id==0){
+    if (self.id==0)
+    {
         up=0;
-	down=0;
+		down=0;
     }
     
-    if (self.id==1){
-	left=0;
-	right=0;
+    if (self.id==1)
+    {
+		left=0;
+		right=0;
     } 
     
-    if (isopen) {
-        socket.send("web" + " " + up.toFixed(3) + " " + down.toFixed(3) + " " + left.toFixed(3) + " " + right.toFixed(3));
-    }
+	//keysMsg = [up.toFixed(3), down.toFixed(3) , left.toFixed(3), right.toFixed(3)];
+    //session.publish('probot2beagle', [keysMsg]);
 
 
 

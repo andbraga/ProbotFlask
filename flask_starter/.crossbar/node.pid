@@ -1,0 +1,19 @@
+{
+    "pid": 3986, 
+    "options": {
+        "reactor": null, 
+        "cdc": false, 
+        "loglevel": "info", 
+        "logtofile": false, 
+        "logformat": "standard", 
+        "command": "start", 
+        "logdir": null, 
+        "config": "config.json", 
+        "colour": "auto", 
+        "cbdir": "/home/user/flask-starter/.crossbar"
+    }, 
+    "argv": [
+        "/home/user/flask-starter/venv/bin/crossbar", 
+        "start"
+    ]
+}

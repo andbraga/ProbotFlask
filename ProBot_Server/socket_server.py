@@ -57,6 +57,7 @@ class AppSession(ApplicationSession):
     def onJoin(self, details):
         #self.lastMsg = 0
         probotid = None
+        lastBat = None
         
         def receive_id(probot_id):
             #self.probotid = probot_id
@@ -69,11 +70,17 @@ class AppSession(ApplicationSession):
                 print(probotid)
                 def receive_msg(msg):
                     self.log.info("event from {topic} received: {msg}", topic=topic, msg=msg)
+                    if "B-" in msg:
+                        global lastBat
+                        lastBat = msg.split('-')[1]
+                        self.log.info("last battery from {topic}: {lastBat}", topic=topic, lastBat=lastBat)
                 self.subscribe(receive_msg, topic)    
             
             def disconnect_keepalive():
                 self.log.info("keepalive not received from probot {probotid}", probotid=probotid)
-                self.publish('bridge-topic', probotid) # para publicar na bridge
+                global lastBat
+                self.publish('bridge-topic', probotid, lastBat) # para publicar na bridge
+                #self.unsubscribe()
             
             self.keep_alive_timer = Timer(30, disconnect_keepalive,())
             self.keep_alive_timer.start()
